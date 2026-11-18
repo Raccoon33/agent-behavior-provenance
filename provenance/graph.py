@@ -2,17 +2,18 @@
 import networkx as nx
 
 
-def build(events, policy, run):
+def build(events, policy, run, *, include_task=True):
     g = nx.MultiDiGraph(run_id=run.name)
     def node(key, typ, **attrs):
         g.add_node(key, node_type=typ, **attrs)
     def edge(a,b,rel,status='observed',ref=''):
         g.add_edge(a,b,relation=rel,evidence_status=status,source_ref=ref)
-    node('task','TrustedTask',source_ref='prompt.txt',label='Task policy (prepared; delivery unknown)')
+    if include_task:
+        node('task','TrustedTask',source_ref='prompt.txt',label='Task policy (prepared; delivery unknown)')
     previous = None
     calls, turns, results = {}, {}, []
     for e in events:
-        typ = {'model_turn':'ModelTurn','model_request':'ModelRequest','tool_call':'ToolCall','tool_result':'ToolResult','final_response':'FinalResponse'}.get(e.kind,'Observation')
+        typ = {'model_turn':'ModelTurn','model_request':'ModelRequest','initial_prompt':'InitialPrompt','tool_call':'ToolCall','tool_result':'ToolResult','final_response':'FinalResponse'}.get(e.kind,'Observation')
         node(e.event_id,typ,source_ref=e.source_ref,label=f'{e.event_id} {e.tool_name or e.kind}',order=e.order)
         if previous: edge(previous,e.event_id,'PRECEDED','chronological',e.source_ref)
         previous = e.event_id
@@ -22,7 +23,7 @@ def build(events, policy, run):
             for result in results:
                 if result.text and result.text in e.text:
                     edge(result.event_id,e.event_id,'AVAILABLE_TO_MODEL','observed',e.source_ref)
-            for line in (run/'prompt.txt').read_text().splitlines() if (run/'prompt.txt').exists() else []:
+            for line in (run/'prompt.txt').read_text().splitlines() if include_task and (run/'prompt.txt').exists() else []:
                 if line.strip() and line in e.text:
                     edge('task',e.event_id,'TASK_TEXT_PRESENT','observed',e.source_ref); break
         if e.kind == 'tool_call':

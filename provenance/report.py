@@ -8,6 +8,15 @@ from .slice import backward_slice
 from .visualize import render
 
 
+def export_graph(graph, output, *, new_output=False):
+    if not nx.is_directed_acyclic_graph(graph):
+        raise ValueError('Evidence graph has a cycle; refusing export')
+    output.mkdir(parents=True, exist_ok=not new_output)
+    nx.write_graphml(graph, output/'graph.graphml')
+    (output/'graph.json').write_text(json.dumps(nx.node_link_data(graph, edges='edges'), indent=2, sort_keys=True)+'\n')
+    render(graph, output/'graph.svg')
+
+
 def exposure(run,events,policy):
     spec=json.loads((run/'scenario.json').read_text()) if (run/'scenario.json').is_file() else {}
     if not spec.get('attacker_objective'):
@@ -43,11 +52,8 @@ def analyze(run,output,snapshot_only=False):
                 protected_attempts=len(policy['attempts']),confirmed_protected_paths=len(policy['protected_paths_changed']),all_recorded_tool_results=sum(e.kind=='tool_result' for e in events),slice_event_count=len({n['node'] for s in slices for section in ('observed','possible') for n in s[section] if n['node'].startswith('e')})),
                 baseline=dict(method='flat chronological log + independent final change detection',events=len(events),protected_paths=policy['protected_paths_changed']),
                 incremental_insight='Versioned integrity evidence and explicit dependency/uncertainty labels. No causal pruning claim; without attribution, confirmed findings may have no observed tool ancestors.')
-    output.mkdir(parents=True,exist_ok=True)
+    export_graph(graph, output)
     (output/'analysis.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
-    nx.write_graphml(graph,output/'graph.graphml')
-    (output/'graph.json').write_text(json.dumps(nx.node_link_data(graph,edges='edges'),indent=2,sort_keys=True)+'\n')
-    render(graph,output/'graph.svg')
     lines=[f'# Analysis: {run.name}','',f'Evidence: **{report["evidence_kind"]}**; coverage: {coverage}.', '',
            f'Exposure: {report["exposure"]["visibility"]}. Independent oracle: {policy["oracle_passed"]}.',
            f'Protected final changes: {policy["protected_paths_changed"]}; parsed protected attempts: {len(policy["attempts"])}.',
