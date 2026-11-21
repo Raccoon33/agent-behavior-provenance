@@ -132,5 +132,25 @@ are local to the selected export, not interchangeable across export sources.
 Reports retain short excerpts; raw evidence and execution command metadata may
 contain task text. Inspect/redact before sharing with others.
 
+### CSV experiment Responses logs
+
+Use the separate `analyze-responses` command for completed runs from the CSV
+experiment harness.
+Point it at the run directory containing `records/executor.jsonl` and
+`records/evaluation.json`. Choose a new output directory outside the run.
+
+```bash
+.venv/bin/python -m provenance.cli analyze-responses --run /path/to/campaign/0006 --output work/0006
+.venv/bin/python -m provenance.cli slice --graph work/0006/graph.graphml --target release:decision
+```
+
+The adapter reads both sessions when a verifier log is present. It matches
+handoff text, script hashes and checked result bytes against the saved records.
+The release slice includes the recorded independent oracle verdict and validator
+outcome. Source references use paths relative to the input run, with JSONL line
+numbers or JSON pointers where available. The check status can be `unavailable`
+even when an invocation is recorded. Context edges are possible influences.
+Raw prompts, tool payloads and model reasoning items are omitted from exports.
+
 See `experiments/protocol.md`, `docs/design_notes.md`,
 `docs/limitations_and_future_work.md`, and `results/IMPLEMENTATION_SUMMARY.md`.
